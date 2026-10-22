@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr" dir="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messages programmés · رسائل مجدولة</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--tx:#1c1f24;--mut:#6b7280;--ac:#2563eb;--bd:#e5e7eb}
+  @media(prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1e24;--tx:#eef0f3;--mut:#9aa3af;--ac:#60a5fa;--bd:#2b3139}}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--tx)}
+  main{max-width:560px;margin:0 auto;padding:16px}
+  h1{font-size:1.3rem;margin:8px 0 16px}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+  label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
+  textarea{min-height:90px;resize:vertical}
+  button{width:100%;margin-top:14px;padding:12px;border:0;border-radius:10px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  .row{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .badge{font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);white-space:nowrap}
+  .pending{color:#b45309}.sent{color:#15803d}.failed{color:#b91c1c}
+  .del{width:auto;margin:0;padding:4px 10px;background:transparent;color:#b91c1c;border:1px solid var(--bd);font-weight:400}
+  small{color:var(--mut)}
+  .quick{display:flex;gap:8px;margin-top:8px}
+  .quick button{margin:0;padding:8px;background:transparent;color:var(--ac);border:1px solid var(--bd);font-weight:500}
+  #clock{display:block;margin-top:6px}
+  .err{display:block;margin:6px 0;color:#b91c1c;word-break:break-word}
+</style>
+</head>
+<body>
+<main>
+  <h1>📨 Messages programmés · رسائل مجدولة</h1>
+
+  <div class="card">
+    <label>Canal · القناة</label>
+    <select id="channel">
+      <option value="email">Email</option>
+      <option value="telegram">Telegram</option>
+      <option value="sms">SMS</option>
+      <option value="whatsapp">WhatsApp</option>
+    </select>
+    <label id="toLabel">Destinataire · المرسل إليه</label>
+    <input id="to" placeholder="ami@example.com">
+    <div id="subjWrap"><label>Objet · الموضوع</label><input id="subject"></div>
+    <label>Message · الرسالة</label>
+    <textarea id="body"></textarea>
+    <label>Date et heure d'envoi · وقت الإرسال</label>
+    <input id="sendAt" type="datetime-local">
+    <div class="quick">
+      <button type="button" data-min="2">+2 min</button>
+      <button type="button" data-min="10">+10 min</button>
+      <button type="button" data-min="60">+1 h</button>
+    </div>
+    <small id="clock"></small>
+    <button id="add">Programmer · جدولة</button>
+    <small id="msg"></small>
+  </div>
+
+  <div id="list"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const hints = { email:'ami@example.com', telegram:'Chat ID (ex. 123456789)', sms:'+213551234567', whatsapp:'+213551234567' };
+function setChannel(){ $('to').placeholder = hints[$('channel').value]; $('subjWrap').style.display = $('channel').value==='email'?'block':'none'; }
+$('channel').onchange = setChannel; setChannel();
+
+// Valeur du champ date/heure en heure LOCALE du PC
+const toInput = (dt) => new Date(dt - dt.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+
+// Par défaut : demain à 09:00
+const d = new Date(Date.now() + 864e5); d.setHours(9, 0, 0, 0);
+$('sendAt').value = toInput(d);
+
+// Boutons rapides : maintenant + N minutes
+document.querySelectorAll('.quick button').forEach(b => b.onclick = () => {
+  const t = new Date(Date.now() + (+b.dataset.min) * 6e4); t.setSeconds(0, 0);
+  $('sendAt').value = toInput(t);
+});
+
+// Horloge : montre l'heure et le fuseau utilisés par le navigateur
+function tickClock(){
+  const now = new Date(), off = -now.getTimezoneOffset() / 60;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  $('clock').textContent = '🕒 Heure de ce PC : ' + now.toLocaleTimeString() +
+    ' (UTC' + (off >= 0 ? '+' : '') + off + ' · ' + tz + ')';
+}
+tickClock(); setInterval(tickClock, 1000);
+
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function remaining(iso){
+  const ms = new Date(iso) - Date.now();
+  if (ms <= 0) return 'envoi imminent…';
+  if (ms < 120000) return 'dans ' + Math.round(ms / 1000) + ' s';
+  const min = Math.round(ms / 60000);
+  if (min < 60) return 'dans ' + min + ' min';
+  if (min < 1440) return 'dans ' + Math.floor(min / 60) + ' h ' + (min % 60) + ' min';
+  return 'dans ' + Math.floor(min / 1440) + ' j ' + Math.floor((min % 1440) / 60) + ' h';
+}
+
+async function refresh(){
+  const r = await fetch('/api/messages'); const list = await r.json();
+  $('list').innerHTML = list.map(m => `
+    <div class="card">
+      <div class="row">
+        <div><b>${esc(m.channel)}</b> → ${esc(m.to)}<br>
+          <small>${new Date(m.sendAt).toLocaleString()}${m.status === 'pending' ? ' · ' + remaining(m.sendAt) : ''}</small></div>
+        <span class="badge ${m.status}">${m.status}</span>
+      </div>
+      <p dir="auto">${esc(m.body)}</p>
+      ${m.error ? `<small class="err">${esc(m.error).slice(0,300)}</small>` : ''}
+      <button class="del" onclick="del('${m.id}')">Supprimer · حذف</button>
+    </div>`).join('') || '<small>Aucun message programmé.</small>';
+}
+async function del(id){ await fetch('/api/messages/'+id,{method:'DELETE'}); refresh(); }
+
+$('add').onclick = async () => {
+  const when = new Date($('sendAt').value);
+  if (isNaN(when)) { $('msg').textContent = '✖ Choisis une date et une heure'; return; }
+  if (when <= new Date()) { $('msg').textContent = '✖ Heure déjà passée (vérifie AM/PM et la date)'; return; }
+  const payload = {
+    channel: $('channel').value, to: $('to').value.trim(), subject: $('subject').value,
+    body: $('body').value.trim(), sendAt: when.toISOString()
+  };
+  const r = await fetch('/api/messages', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  if (r.ok) {
+    $('body').value = '';
+    $('msg').textContent = '✔ Programmé pour ' + when.toLocaleString();
+    refresh();
+  } else {
+    $('msg').textContent = '✖ ' + (await r.json()).error;
+  }
+};
+refresh(); setInterval(refresh, 10000);
+</script>
+</body>
+</html>

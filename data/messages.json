@@ -1,0 +1,24 @@
+[
+  {
+    "id": "2ba8e7fb-3747-443a-957b-0790948d5044",
+    "channel": "email",
+    "to": "karimsuslu@gmail.com",
+    "subject": "dd",
+    "body": "ff",
+    "sendAt": "2026-10-21T10:52:00.000Z",
+    "status": "sent",
+    "error": null,
+    "sentAt": "2026-10-21T10:52:15.266Z"
+  },
+  {
+    "id": "a1221d84-9743-4c5a-ab39-2304e3e4ac76",
+    "channel": "whatsapp",
+    "to": "+21624919108",
+    "subject": "dd",
+    "body": "dd",
+    "sendAt": "2026-10-21T10:53:00.000Z",
+    "status": "failed",
+    "error": "Twilio: {\"code\":20404,\"message\":\"The requested resource /2010-04-01/Accounts//Messages.json was not found\",\"more_info\":\"https://www.twilio.com/docs/errors/20404\",\"status\":404}",
+    "sentAt": "2026-10-21T10:53:13.688Z"
+  }
+]

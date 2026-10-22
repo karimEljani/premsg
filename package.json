@@ -1,0 +1,9 @@
+{
+  "name": "scheduled-messages",
+  "version": "1.0.0",
+  "description": "Messages programmés / رسائل مجدولة",
+  "main": "server.js",
+  "scripts": { "start": "node --env-file=.env server.js" },
+  "engines": { "node": ">=20.6" },
+  "dependencies": { "express": "^4.19.2", "nodemailer": "^6.9.14" }
+}
